@@ -3,18 +3,26 @@ import { randomUUID } from 'node:crypto'
 import mysql from 'mysql2/promise'
 
 const pool = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '',  
-  database: 'movies',      
-  port: 3306
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',  
+  database: process.env.DB_NAME || 'movies',      
+  port: parseInt(process.env.DB_PORT) || 3306
 })
 
 export class MovieModel {
-  static async getAll() {
-  const [rows] = await pool.query('SELECT * FROM peliculas')
-  return rows.map(r => ({ ...r, genre: JSON.parse(r.genre) }))
-}
+  static async getAll({ genre } = {}) {
+    let query = 'SELECT * FROM peliculas'
+    let params = []
+    
+    if (genre) {
+      query += ' WHERE JSON_CONTAINS(genre, ?)'
+      params.push(JSON.stringify(genre))
+    }
+    
+    const [rows] = await pool.query(query, params)
+    return rows.map(r => ({ ...r, genre: JSON.parse(r.genre) }))
+  }
 
 
   static async getById({ id }) {

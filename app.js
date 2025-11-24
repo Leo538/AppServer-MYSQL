@@ -1,4 +1,5 @@
 
+import 'dotenv/config'
 import express , {json} from 'express'
 import { corsMiddleware } from './middlewares/cors.js'
 import {movieRouter} from './routes/movie.js'  

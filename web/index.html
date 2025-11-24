@@ -9,69 +9,447 @@
 </head>
 
 <body>
+  <header>
+    <h1>🎬 Gestión de Películas</h1>
+    <button id="btn-agregar" class="btn-agregar">➕ Agregar Película</button>
+  </header>
   <main></main>
 
   <script type="module">
-    fetch('http://localhost:3500/movies')
-      .then(res => res.json())
-      .then(movies => {
-        const html = movies.map(movie => `
-          <article data-id="${movie.id}">
-            <h2>${movie.title}</h2>
-            <img src="${movie.poster}">
-            <p>${movie.year}</p>
-            <button>Eliminar</button>
-          </article>
-        `).join('');
+    // ⚙️ CONFIGURACIÓN: Cambia esta URL por la URL de tu backend en producción
+    // Para desarrollo local: 'http://localhost:3500'
+    // Para producción: 'https://tu-backend-url.com' (sin barra al final)
+    // Ejemplo: const API_URL = 'https://mi-backend.railway.app';
+    const API_URL = 'http://localhost:3500';
+    
+    const genres = ['Action', 'Adventure', 'Comedy', 'Drama', 'Crime', 'Fantasy', 'Horror', 'Thriller', 'Sci-Fi'];
 
-        document.querySelector('main').innerHTML = html;
+    // Función para cargar y mostrar películas
+    async function loadMovies() {
+      try {
+        const res = await fetch(`${API_URL}/movies`);
+        const movies = await res.json();
+        renderMovies(movies);
+      } catch (error) {
+        Swal.fire('Error', 'No se pudo cargar las películas.', 'error');
+      }
+    }
 
-        document.addEventListener('click', async e => {
-          if (e.target.matches('button')) {
-            const article = e.target.closest('article');
-            const id = article.dataset.id;
-            const title = article.querySelector('h2').textContent;
+    // Función para renderizar las películas
+    function renderMovies(movies) {
+      const html = movies.map(movie => `
+        <article data-id="${movie.id}">
+          <h2>${movie.title}</h2>
+          <img src="${movie.poster}" alt="${movie.title}">
+          <p><strong>Año:</strong> ${movie.year}</p>
+          <p><strong>Director:</strong> ${movie.director || 'N/A'}</p>
+          <p><strong>Duración:</strong> ${movie.duration} min</p>
+          <p><strong>Género:</strong> ${Array.isArray(movie.genre) ? movie.genre.join(', ') : movie.genre}</p>
+          <p><strong>Calificación:</strong> ${movie.rate}/10</p>
+          <div class="button-group">
+            <button class="btn-editar" data-id="${movie.id}">✏️ Editar</button>
+            <button class="btn-eliminar" data-id="${movie.id}">🗑️ Eliminar</button>
+          </div>
+        </article>
+      `).join('');
 
-        
-            const result = await Swal.fire({
-              title: '¿Estás seguro?',
-              html: `<b>${title}</b> será eliminado permanentemente.`,
-              icon: 'warning',
-              showCancelButton: true,
-              confirmButtonColor: '#e74c3c',
-              cancelButtonColor: '#6c757d',
-              confirmButtonText: 'Sí, eliminar',
-              cancelButtonText: 'Cancelar',
-              background: '#fff',
-              color: '#333',
-              reverseButtons: true,
-              focusCancel: true,
-            });
+      document.querySelector('main').innerHTML = html;
+    }
 
-            if (result.isConfirmed) {
-              fetch(`http://localhost:3500/movies/${id}`, {
-                method: 'DELETE'
-              })
-                .then(res => {
-                  if (res.ok) {
-                    article.remove();
-                    Swal.fire({
-                      title: 'Eliminado',
-                      text: `"${title}" se eliminó correctamente.`,
-                      icon: 'success',
-                      confirmButtonColor: '#3085d6',
-                      background: '#fff',
-                      color: '#333'
-                    });
-                  } else {
-                    Swal.fire('Error', 'No se pudo eliminar la película.', 'error');
-                  }
-                })
-                .catch(() => Swal.fire('Error', 'No se pudo conectar con el servidor.', 'error'));
+    // Función para mostrar formulario de crear/editar
+    async function showMovieForm(movie = null) {
+      const isEdit = movie !== null;
+      const selectedGenres = movie && movie.genre ? movie.genre : [];
+      
+      // Crear checkboxes para géneros
+      const genreCheckboxes = genres.map(g => {
+        const isChecked = selectedGenres.includes(g);
+        return `
+          <label class="genre-checkbox-label">
+            <input type="checkbox" class="genre-checkbox" value="${g}" ${isChecked ? 'checked' : ''}>
+            <span>${g}</span>
+          </label>
+        `;
+      }).join('');
+
+      const { value: formValues } = await Swal.fire({
+        title: isEdit ? '<span style="font-size: 24px; color: #333;">✏️ Editar Película</span>' : '<span style="font-size: 24px; color: #333;">➕ Agregar Nueva Película</span>',
+        html: `
+          <div style="text-align: left; max-width: 100%;">
+            <div style="margin-bottom: 18px;">
+              <label style="display: block; font-weight: 600; color: #2c3e50; margin-bottom: 6px; font-size: 14px;">Título <span style="color: #e74c3c;">*</span></label>
+              <input id="swal-title" style="width: 100%; padding: 10px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; transition: border-color 0.3s;" placeholder="Ej: The Matrix" value="${movie?.title || ''}" required>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 18px;">
+              <div>
+                <label style="display: block; font-weight: 600; color: #2c3e50; margin-bottom: 6px; font-size: 14px;">Año <span style="color: #e74c3c;">*</span></label>
+                <input id="swal-year" style="width: 100%; padding: 10px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; transition: border-color 0.3s;" type="number" placeholder="2024" min="1900" max="2025" value="${movie?.year || ''}" required>
+              </div>
+              <div>
+                <label style="display: block; font-weight: 600; color: #2c3e50; margin-bottom: 6px; font-size: 14px;">Duración (min) <span style="color: #e74c3c;">*</span></label>
+                <input id="swal-duration" style="width: 100%; padding: 10px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; transition: border-color 0.3s;" type="number" placeholder="120" min="1" value="${movie?.duration || ''}" required>
+              </div>
+            </div>
+            
+            <div style="margin-bottom: 18px;">
+              <label style="display: block; font-weight: 600; color: #2c3e50; margin-bottom: 6px; font-size: 14px;">Director <span style="color: #e74c3c;">*</span></label>
+              <input id="swal-director" style="width: 100%; padding: 10px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; transition: border-color 0.3s;" placeholder="Ej: Christopher Nolan" value="${movie?.director || ''}" required>
+            </div>
+            
+            <div style="margin-bottom: 18px;">
+              <label style="display: block; font-weight: 600; color: #2c3e50; margin-bottom: 6px; font-size: 14px;">URL del Poster <span style="color: #e74c3c;">*</span></label>
+              <input id="swal-poster" style="width: 100%; padding: 10px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; transition: border-color 0.3s;" type="url" placeholder="https://ejemplo.com/poster.jpg" value="${movie?.poster || ''}" required>
+            </div>
+            
+            <div style="margin-bottom: 18px;">
+              <label style="display: block; font-weight: 600; color: #2c3e50; margin-bottom: 6px; font-size: 14px;">Calificación (0-10) <span style="color: #e74c3c;">*</span></label>
+              <input id="swal-rate" style="width: 100%; padding: 10px 12px; border: 2px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; transition: border-color 0.3s;" type="number" step="0.1" placeholder="5.0" min="0" max="10" value="${movie?.rate || 5}" required>
+            </div>
+            
+            <div style="margin-bottom: 18px;">
+              <label style="display: block; font-weight: 600; color: #2c3e50; margin-bottom: 8px; font-size: 14px;">Géneros <span style="color: #e74c3c;">*</span></label>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 12px; background: #f8f9fa; border: 2px solid #ddd; border-radius: 6px; max-height: 160px; overflow-y: auto;">
+                ${genreCheckboxes}
+              </div>
+              <small style="display: block; color: #7f8c8d; font-size: 11px; margin-top: 5px;">Selecciona uno o más géneros</small>
+            </div>
+          </div>
+        `,
+        width: '650px',
+        padding: '2rem',
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: isEdit ? '💾 Guardar Cambios' : '✨ Crear Película',
+        cancelButtonText: '❌ Cancelar',
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#6c757d',
+        background: '#fff',
+        color: '#333',
+        customClass: {
+          popup: 'custom-swal-popup',
+          htmlContainer: 'custom-swal-html'
+        },
+        didOpen: () => {
+          // Agregar estilos dinámicos mejorados
+          const style = document.createElement('style');
+          style.id = 'swal-custom-styles';
+          style.textContent = `
+            .custom-swal-popup {
+              border-radius: 16px !important;
+              box-shadow: 0 20px 60px rgba(0,0,0,0.3) !important;
+              padding: 0 !important;
             }
+            .custom-swal-html {
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .swal2-title {
+              padding: 20px 20px 10px 20px !important;
+              margin-bottom: 10px !important;
+            }
+            .swal2-html-container {
+              padding: 0 20px 10px 20px !important;
+            }
+            .swal2-actions {
+              padding: 15px 20px 20px 20px !important;
+              margin-top: 10px !important;
+            }
+            input[type="text"],
+            input[type="number"],
+            input[type="url"] {
+              width: 100% !important;
+              padding: 10px 12px !important;
+              border: 2px solid #ddd !important;
+              border-radius: 6px !important;
+              font-size: 14px !important;
+              box-sizing: border-box !important;
+              transition: all 0.3s ease !important;
+              font-family: Arial, sans-serif !important;
+            }
+            input[type="text"]:focus,
+            input[type="number"]:focus,
+            input[type="url"]:focus {
+              outline: none !important;
+              border-color: #3085d6 !important;
+              box-shadow: 0 0 0 3px rgba(48, 133, 214, 0.1) !important;
+            }
+            .genre-checkbox-label {
+              display: flex !important;
+              align-items: center !important;
+              cursor: pointer !important;
+              padding: 8px 10px !important;
+              border-radius: 5px !important;
+              transition: all 0.2s ease !important;
+              background: #fff !important;
+              border: 1px solid #e0e0e0 !important;
+            }
+            .genre-checkbox-label:hover {
+              background-color: #e8f4f8 !important;
+              border-color: #3085d6 !important;
+              transform: translateY(-1px) !important;
+            }
+            .genre-checkbox {
+              margin-right: 8px !important;
+              width: 18px !important;
+              height: 18px !important;
+              cursor: pointer !important;
+              accent-color: #3085d6 !important;
+            }
+            .genre-checkbox:checked + span {
+              font-weight: 600 !important;
+              color: #3085d6 !important;
+            }
+            .swal2-confirm {
+              font-weight: 600 !important;
+              padding: 12px 30px !important;
+              border-radius: 8px !important;
+              transition: all 0.3s ease !important;
+            }
+            .swal2-confirm:hover {
+              transform: translateY(-2px) !important;
+              box-shadow: 0 4px 12px rgba(48, 133, 214, 0.4) !important;
+            }
+            .swal2-cancel {
+              font-weight: 600 !important;
+              padding: 12px 30px !important;
+              border-radius: 8px !important;
+              transition: all 0.3s ease !important;
+            }
+            .swal2-cancel:hover {
+              transform: translateY(-2px) !important;
+              box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3) !important;
+            }
+          `;
+          // Remover estilos anteriores si existen
+          const existingStyle = document.getElementById('swal-custom-styles');
+          if (existingStyle) existingStyle.remove();
+          document.head.appendChild(style);
+          
+          // Agregar eventos de focus a los inputs
+          const inputs = document.querySelectorAll('input[type="text"], input[type="number"], input[type="url"]');
+          inputs.forEach(input => {
+            input.addEventListener('focus', function() {
+              this.style.borderColor = '#3085d6';
+              this.style.boxShadow = '0 0 0 3px rgba(48, 133, 214, 0.1)';
+            });
+            input.addEventListener('blur', function() {
+              this.style.borderColor = '#ddd';
+              this.style.boxShadow = 'none';
+            });
+          });
+        },
+        preConfirm: () => {
+          const title = document.getElementById('swal-title').value.trim();
+          const year = parseInt(document.getElementById('swal-year').value);
+          const director = document.getElementById('swal-director').value.trim();
+          const duration = parseInt(document.getElementById('swal-duration').value);
+          const poster = document.getElementById('swal-poster').value.trim();
+          const rate = parseFloat(document.getElementById('swal-rate').value);
+          const genreCheckboxes = document.querySelectorAll('.genre-checkbox:checked');
+          const genre = Array.from(genreCheckboxes).map(cb => cb.value);
+
+          if (!title) {
+            Swal.showValidationMessage('El título es requerido');
+            return false;
           }
-        });
+          if (!year || year < 1900 || year > 2025) {
+            Swal.showValidationMessage('El año debe estar entre 1900 y 2025');
+            return false;
+          }
+          if (!director) {
+            Swal.showValidationMessage('El director es requerido');
+            return false;
+          }
+          if (!duration || duration < 1) {
+            Swal.showValidationMessage('La duración debe ser mayor a 0');
+            return false;
+          }
+          if (!poster) {
+            Swal.showValidationMessage('La URL del poster es requerida');
+            return false;
+          }
+          if (genre.length === 0) {
+            Swal.showValidationMessage('Debes seleccionar al menos un género');
+            return false;
+          }
+          if (!rate || rate < 0 || rate > 10) {
+            Swal.showValidationMessage('La calificación debe estar entre 0 y 10');
+            return false;
+          }
+
+          return {
+            title,
+            year,
+            director,
+            duration,
+            poster,
+            rate: rate || 5,
+            genre
+          };
+        }
       });
+
+      if (formValues) {
+        if (isEdit) {
+          await updateMovie(movie.id, formValues);
+        } else {
+          await createMovie(formValues);
+        }
+      }
+    }
+
+    // Función para crear película
+    async function createMovie(movieData) {
+      try {
+        const res = await fetch(`${API_URL}/movies`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(movieData)
+        });
+
+        if (res.ok) {
+          Swal.fire({
+            title: '¡Éxito!',
+            text: 'Película creada correctamente.',
+            icon: 'success',
+            confirmButtonColor: '#3085d6',
+            background: '#fff',
+            color: '#333'
+          });
+          loadMovies();
+        } else {
+          const error = await res.json();
+          Swal.fire('Error', error.error || 'No se pudo crear la película.', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', 'No se pudo conectar con el servidor.', 'error');
+      }
+    }
+
+    // Función para actualizar película
+    async function updateMovie(id, movieData) {
+      try {
+        const res = await fetch(`${API_URL}/movies/${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(movieData)
+        });
+
+        if (res.ok) {
+          Swal.fire({
+            title: '¡Éxito!',
+            text: 'Película actualizada correctamente.',
+            icon: 'success',
+            confirmButtonColor: '#3085d6',
+            background: '#fff',
+            color: '#333'
+          });
+          loadMovies();
+        } else {
+          const error = await res.json();
+          Swal.fire('Error', error.error || 'No se pudo actualizar la película.', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', 'No se pudo conectar con el servidor.', 'error');
+      }
+    }
+
+    // Función para eliminar película
+    async function deleteMovie(id, title) {
+      const result = await Swal.fire({
+        title: '<span style="font-size: 24px; color: #333;">⚠️ Confirmar Eliminación</span>',
+        html: `
+          <div style="text-align: center; padding: 10px 0;">
+            <p style="font-size: 16px; color: #2c3e50; margin-bottom: 15px; line-height: 1.5;">
+              ¿Estás seguro de que deseas eliminar esta película?
+            </p>
+            <div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 15px; margin: 15px 0;">
+              <p style="font-size: 20px; font-weight: bold; color: #e74c3c; margin: 0;">
+                "${title}"
+              </p>
+            </div>
+            <p style="font-size: 13px; color: #7f8c8d; font-style: italic; margin-top: 10px;">
+              ⚠️ Esta acción no se puede deshacer
+            </p>
+          </div>
+        `,
+        icon: 'warning',
+        iconColor: '#e74c3c',
+        showCancelButton: true,
+        confirmButtonColor: '#e74c3c',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '🗑️ Sí, eliminar',
+        cancelButtonText: '❌ Cancelar',
+        background: '#fff',
+        color: '#333',
+        reverseButtons: true,
+        focusCancel: true,
+        customClass: {
+          popup: 'custom-swal-popup',
+          title: 'custom-swal-title',
+          confirmButton: 'custom-swal-confirm'
+        },
+        width: '500px',
+        padding: '2rem'
+      });
+
+      if (result.isConfirmed) {
+        try {
+          const res = await fetch(`${API_URL}/movies/${id}`, {
+            method: 'DELETE'
+          });
+
+          if (res.ok) {
+            Swal.fire({
+              title: 'Eliminado',
+              text: `"${title}" se eliminó correctamente.`,
+              icon: 'success',
+              confirmButtonColor: '#3085d6',
+              background: '#fff',
+              color: '#333'
+            });
+            loadMovies();
+          } else {
+            Swal.fire('Error', 'No se pudo eliminar la película.', 'error');
+          }
+        } catch (error) {
+          Swal.fire('Error', 'No se pudo conectar con el servidor.', 'error');
+        }
+      }
+    }
+
+    // Event listeners
+    document.getElementById('btn-agregar').addEventListener('click', () => showMovieForm());
+
+    document.addEventListener('click', async e => {
+      if (e.target.matches('.btn-eliminar')) {
+        const id = e.target.dataset.id;
+        const article = e.target.closest('article');
+        const title = article.querySelector('h2').textContent;
+        await deleteMovie(id, title);
+      } else if (e.target.matches('.btn-editar')) {
+        const id = e.target.dataset.id;
+        try {
+          const res = await fetch(`${API_URL}/movies/${id}`);
+          if (res.ok) {
+            const movie = await res.json();
+            await showMovieForm(movie);
+          } else {
+            Swal.fire('Error', 'No se pudo cargar la película.', 'error');
+          }
+        } catch (error) {
+          Swal.fire('Error', 'No se pudo conectar con el servidor.', 'error');
+        }
+      }
+    });
+
+    // Cargar películas al iniciar
+    loadMovies();
   </script>
 </body>
 </html>
